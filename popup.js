@@ -70,6 +70,13 @@ function changeBackgroundColor(color) {
   });
 }
 
+function updateTimeSpent(url, time) {
+  var script = 'document.body.container="' + url + ": " + time'";';
+  chrome.tabs.executeScript({
+    code: script
+  });
+}
+
 /**
  * Gets the saved background color for url.
  *
@@ -83,6 +90,13 @@ function getSavedBackgroundColor(url, callback) {
   // fails.
   chrome.storage.sync.get(url, (items) => {
     callback(chrome.runtime.lastError ? null : items[url]);
+  });
+}
+
+function getTimeSpent(url, callback) {
+  var top_domain = getTopLevelDomain(url).hostname;
+  chrome.storage.sync.get(top_domain, function (items) {
+    callback(chrome.runtime.lastError ? null : items[top_domain]);
   });
 }
 
@@ -101,6 +115,14 @@ function saveBackgroundColor(url, color) {
   chrome.storage.sync.set(items);
 }
 
+function saveTimeSpent(url, time, callback){
+  var items = {};
+  var top_domain = getTopLevelDomain(url).hostname;
+  items[top_domain] = time;
+  chrome.storage.sync.set(items);
+  callback();
+}
+
 // This extension loads the saved background color for the current tab if one
 // exists. The user can select a new background color from the dropdown for the
 // current page, and it will be saved as part of the extension's isolated
@@ -110,6 +132,27 @@ function saveBackgroundColor(url, color) {
 // chrome.storage.local allows the extension data to be synced across multiple
 // user devices.
 document.addEventListener('DOMContentLoaded', () => {
+
+  var inter = setInterval(function () {
+    var time = 0;
+      getCurrentTabUrl((url) => {
+        getTimeSpent(url, (item) => {
+          if (item) {
+              time = item + 1;
+          }
+          else {
+            console.log("starting at 0");
+            time = 1;
+          }
+          saveTimeSpent(url, time, function() {
+            //console.log("Url: " + getTopLevelDomain(url).hostname);
+          // console.log("Updated: " + time);
+          });
+        });
+      });
+    }, 1000);
+
+
   getCurrentTabUrl((url) => {
     var dropdown = document.getElementById('dropdown');
 
@@ -117,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // value, if needed.
     getSavedBackgroundColor(url, (savedColor) => {
       if (savedColor) {
+        console.log(savedColor);
         changeBackgroundColor(savedColor);
         dropdown.value = savedColor;
       }
@@ -125,9 +169,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Ensure the background color is changed and saved when the dropdown
     // selection changes.
     dropdown.addEventListener('change', () => {
-      var top_dom = getTopLevelDomain(url);
-      console.log(top_dom.hostname);
-      console.log("URL above");
       changeBackgroundColor(dropdown.value);
       saveBackgroundColor(url, dropdown.value);
     });
