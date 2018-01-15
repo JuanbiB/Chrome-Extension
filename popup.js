@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-var getTopLevelDomain = function(href){
+function getTopLevelDomain(href) {
   var url = document.createElement("a");
   url.href = href;
-  return url;
+  return url.hostname;
 }
 
 /**
@@ -42,15 +42,6 @@ function getCurrentTabUrl(callback) {
 
     callback(url);
   });
-
-  // Most methods of the Chrome extension APIs are asynchronous. This means that
-  // you CANNOT do something like this:
-  //
-  // var url;
-  // chrome.tabs.query(queryInfo, (tabs) => {
-  //   url = tabs[0].url;
-  // });
-  // alert(url); // Shows "undefined", because chrome.tabs.query is async.
 }
 
 /**
@@ -71,10 +62,21 @@ function changeBackgroundColor(color) {
 }
 
 function updateTimeSpent(url, time) {
-  var script = 'document.body.container="' + url + ": " + time'";';
-  chrome.tabs.executeScript({
-    code: script
-  });
+  if (document.getElementById(url) === null){
+    console.log("Created row for: " + url);
+    createTimeSpentRow(url);
+  }
+  document.getElementById(url).innerHTML=" \
+    <td> www."+ url + "</td> \
+    <td>" + time + " sec </td> \
+    ";
+  console.log("updated row for: " + url);
+}
+
+function createTimeSpentRow(url) {
+  console.log("Created row for " + url);
+  document.getElementById("timeTable").innerHTML += " \
+    <tr id=" + url + "> </tr>";
 }
 
 /**
@@ -94,7 +96,7 @@ function getSavedBackgroundColor(url, callback) {
 }
 
 function getTimeSpent(url, callback) {
-  var top_domain = getTopLevelDomain(url).hostname;
+  var top_domain = getTopLevelDomain(url);
   chrome.storage.sync.get(top_domain, function (items) {
     callback(chrome.runtime.lastError ? null : items[top_domain]);
   });
@@ -117,10 +119,10 @@ function saveBackgroundColor(url, color) {
 
 function saveTimeSpent(url, time, callback){
   var items = {};
-  var top_domain = getTopLevelDomain(url).hostname;
+  var top_domain = getTopLevelDomain(url);
   items[top_domain] = time;
   chrome.storage.sync.set(items);
-  callback();
+  callback(top_domain, time);
 }
 
 // This extension loads the saved background color for the current tab if one
@@ -131,8 +133,16 @@ function saveTimeSpent(url, time, callback){
 // to a document's origin. Also, using chrome.storage.sync instead of
 // chrome.storage.local allows the extension data to be synced across multiple
 // user devices.
-document.addEventListener('DOMContentLoaded', () => {
 
+chrome.browserAction.onClicked.addListener(function(tab) {
+  // Run the following code when the popup is opened
+
+  console.log("AYYYY");
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById("timeTable").innerHTML="fuuuick";
+  //chrome.storage.sync.clear();
   var inter = setInterval(function () {
     var time = 0;
       getCurrentTabUrl((url) => {
@@ -144,10 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log("starting at 0");
             time = 1;
           }
-          saveTimeSpent(url, time, function() {
-            //console.log("Url: " + getTopLevelDomain(url).hostname);
-          // console.log("Updated: " + time);
-          });
+          saveTimeSpent(url, time, updateTimeSpent);
         });
       });
     }, 1000);
